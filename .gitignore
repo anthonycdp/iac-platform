@@ -1,0 +1,65 @@
+# =============================================================================
+# .gitignore for Terraform Infrastructure Project
+# =============================================================================
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+terraform.tfstate.d/
+
+# Terragrunt
+.terragrunt-cache/
+**/.terragrunt-cache/
+terragrunt-debug.tfvars.json
+**/.terragrunt-source-map
+
+# Cost estimation
+.infracost/
+infracost.json
+
+# Sensitive files - only ignore files with "secrets" in the name
+*secrets*.tfvars
+*secret*.tfvars
+secrets.tf
+*.pem
+*.key
+secrets.yaml
+secrets.json
+*.private-key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+dist/
+build/
+
+# Test files
+coverage/
+.coverage
+*.cover
+
+# Backup files
+*.bak
+*.backup
