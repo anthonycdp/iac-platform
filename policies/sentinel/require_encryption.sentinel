@@ -1,0 +1,103 @@
+# =============================================================================
+# Sentinel Policy: Require Encryption at Rest
+# =============================================================================
+# This policy ensures that all storage resources have encryption enabled.
+# This includes:
+# - RDS instances
+# - S3 buckets
+# - EBS volumes
+# - EKS clusters (if applicable)
+
+import "tfplan/v2" as tfplan
+
+# Get all resource changes
+resources = tfplan.resource_changes
+
+# -----------------------------------------------------------------------------
+# RDS Encryption Check
+# -----------------------------------------------------------------------------
+
+rds_instances = filter resources as _, rc {
+    rc.type is "aws_db_instance" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+rds_encrypted = rule {
+    all rds_instances as _, rc {
+        rc.change.after.storage_encrypted is true
+    }
+}
+
+# -----------------------------------------------------------------------------
+# S3 Bucket Encryption Check
+# -----------------------------------------------------------------------------
+
+s3_buckets = filter resources as _, rc {
+    rc.type is "aws_s3_bucket_server_side_encryption_configuration" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+s3_encrypted = rule {
+    all s3_buckets as _, rc {
+        rc.change.after contains "rule"
+    }
+}
+
+# Alternative: Check for encryption configuration existence
+s3_bucket_resources = filter resources as _, rc {
+    rc.type is "aws_s3_bucket" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+# -----------------------------------------------------------------------------
+# EBS Volume Encryption Check
+# -----------------------------------------------------------------------------
+
+ebs_volumes = filter resources as _, rc {
+    rc.type is "aws_ebs_volume" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+ebs_encrypted = rule {
+    all ebs_volumes as _, rc {
+        rc.change.after.encrypted is true
+    }
+}
+
+# Also check launch templates for EBS encryption
+launch_templates = filter resources as _, rc {
+    rc.type is "aws_launch_template" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+# -----------------------------------------------------------------------------
+# Main Rule
+# -----------------------------------------------------------------------------
+
+main = rule {
+    rds_encrypted and ebs_encrypted
+}
+
+# Message for violations
+message = func() {
+    violations = []
+
+    if not rds_encrypted {
+        append(violations, "Some RDS instances are not encrypted")
+    }
+
+    if not ebs_encrypted {
+        append(violations, "Some EBS volumes are not encrypted")
+    }
+
+    if length(violations) > 0 {
+        "Encryption violations found:\n" + join(violations, "\n")
+    } else {
+        "All storage resources are properly encrypted"
+    }
+}

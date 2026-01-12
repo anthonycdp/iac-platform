@@ -1,0 +1,243 @@
+# =============================================================================
+# GitHub Actions Workflow: Terraform CI/CD
+# =============================================================================
+# This workflow runs on pull requests and pushes to main branch.
+# It validates, plans, and applies Terraform configurations.
+
+name: Terraform CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**'
+
+env:
+  TF_VERSION: "1.6.0"
+  AWS_REGION: "us-east-1"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Validation Job
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        working-directory: environments/${{ matrix.environment }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        working-directory: environments/${{ matrix.environment }}
+        run: |
+          terraform init \
+            -backend=false
+
+      - name: Terraform Validate
+        working-directory: environments/${{ matrix.environment }}
+        run: terraform validate
+
+  # ---------------------------------------------------------------------------
+  # Security Scan with OPA/Conftest
+  # ---------------------------------------------------------------------------
+  security-scan:
+    name: Security Policy Check
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Setup Conftest
+        uses: instrumenta/conftest-action@master
+        with:
+          version: "0.43.0"
+
+      - name: Terraform Init (Dev)
+        working-directory: environments/dev
+        run: terraform init -backend=false
+
+      - name: Generate Terraform Plan JSON
+        working-directory: environments/dev
+        run: |
+          terraform plan -out=tfplan -input=false
+          terraform show -json tfplan > tfplan.json
+
+      - name: Run OPA Policy Checks
+        working-directory: 22-iac-platform
+        run: |
+          conftest test environments/dev/tfplan.json \
+            --policy policies/opa \
+            --all-namespaces
+
+  # ---------------------------------------------------------------------------
+  # Plan Job (Pull Requests)
+  # ---------------------------------------------------------------------------
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'pull_request'
+
+    strategy:
+      matrix:
+        environment: [dev]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: environments/${{ matrix.environment }}
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: environments/${{ matrix.environment }}
+        run: |
+          terraform plan \
+            -input=false \
+            -var-file=terraform.tfvars \
+            -out=tfplan
+
+      - name: Comment Plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = `${{ steps.plan.outputs.stdout }}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## Terraform Plan (${{ matrix.environment }})\n```\n' + plan + '\n```'
+            });
+
+  # ---------------------------------------------------------------------------
+  # Apply Job (Main Branch)
+  # ---------------------------------------------------------------------------
+  apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: [validate, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    environment:
+      name: development
+      url: https://dev.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: environments/dev
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
+
+      - name: Terraform Apply
+        working-directory: environments/dev
+        run: |
+          terraform apply \
+            -input=false \
+            -var-file=terraform.tfvars \
+            -auto-approve
+
+  # ---------------------------------------------------------------------------
+  # Production Apply (Manual Trigger)
+  # ---------------------------------------------------------------------------
+  apply-prod:
+    name: Terraform Apply (Production)
+    runs-on: ubuntu-latest
+    needs: [validate, security-scan]
+    if: github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+      url: https://www.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: environments/prod
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET_PROD }}" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE_PROD }}"
+
+      - name: Terraform Apply
+        working-directory: environments/prod
+        run: |
+          terraform apply \
+            -input=false \
+            -var-file=terraform.tfvars \
+            -auto-approve

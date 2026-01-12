@@ -1,0 +1,55 @@
+# =============================================================================
+# Sentinel Policy: Require Tags on All Resources
+# =============================================================================
+# This policy ensures that all resources have the required tags:
+# - Environment
+# - ManagedBy
+# - Project
+#
+# This is a foundational governance policy for resource organization
+# and cost allocation.
+
+import "tfplan/v2" as tfplan
+
+# Required tags that must be present on all resources
+required_tags = [
+    "Environment",
+    "ManagedBy",
+    "Project",
+]
+
+# Get all resources from the Terraform plan
+resources = tfplan.resource_changes
+
+# Filter to only resources that support tags
+taggable_resources = filter resources as _, rc {
+    rc.mode is "managed" and
+    rc.change.after contains "tags"
+}
+
+# Main rule: All taggable resources must have required tags
+main = rule {
+    all taggable_resources as _, rc {
+        all required_tags as tag {
+            rc.change.after.tags contains tag
+        }
+    }
+}
+
+# Error messages
+message = func() {
+    violations = []
+    for taggable_resources as address, rc {
+        missing = filter required_tags as tag {
+            not (rc.change.after.tags contains tag)
+        }
+        if length(missing) > 0 {
+            append(violations, "${address} is missing tags: ${join(missing, ", ")}")
+        }
+    }
+    if length(violations) > 0 {
+        "The following resources are missing required tags:\n" + join(violations, "\n")
+    } else {
+        "All resources have the required tags"
+    }
+}

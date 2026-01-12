@@ -1,0 +1,35 @@
+# =============================================================================
+# Infracost Configuration
+# =============================================================================
+# Configuration for cost estimation with Infracost.
+
+version: 0.1
+
+# Number of decimal places to round costs to
+rounding: 2
+
+# Output formats
+format: table
+
+# Enable usage-based resources
+usage: infracost-usage.yml
+
+# Pricing API endpoint (optional, defaults to Infracost Cloud)
+# pricing_api_endpoint: https://pricing.api.infracost.io
+
+# Multi-project support
+projects:
+  - path: environments/dev
+    name: Development
+    terraform_vars:
+      - terraform.tfvars
+
+  - path: environments/staging
+    name: Staging
+    terraform_vars:
+      - terraform.tfvars
+
+  - path: environments/prod
+    name: Production
+    terraform_vars:
+      - terraform.tfvars

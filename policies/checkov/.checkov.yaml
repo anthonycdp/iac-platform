@@ -1,0 +1,36 @@
+# =============================================================================
+# Checkov Configuration
+# =============================================================================
+# Configuration file for Checkov IaC security scanning.
+
+branch: main
+compact: true
+download-external-modules: true
+evaluate-variables: true
+framework:
+  - terraform
+  - cloudformation
+  - kubernetes
+  - dockerfile
+output:
+  - cli
+  - sarif
+  - junitxml
+output-file-path: ./reports/
+soft-fail: false
+skip-check:
+  # Skip checks that are not applicable or have known exceptions
+  - CKV_AWS_79  # Ensure Instance Metadata Service Version 1 is not enabled (handled by module)
+  - CKV2_AWS_19  # Ensure that all EIP addresses allocated to a VPC are attached to EC2 instances
+check:
+  # Explicitly include specific checks
+  - CKV_AWS_18  # Ensure the S3 bucket has access logging enabled
+  - CKV_AWS_19  # Ensure the S3 bucket has server-side-encryption enabled
+  - CKV_AWS_20  # Ensure the S3 bucket does not allow READ permissions to everyone
+  - CKV_AWS_21  # Ensure the S3 bucket does not allow WRITE permissions to everyone
+  - CKV_AWS_22  # Ensure the S3 bucket does not allow READ_ACP permissions to everyone
+  - CKV_AWS_23  # Ensure the S3 bucket does not allow WRITE_ACP permissions to everyone
+  - CKV_AWS_52  # Ensure S3 bucket has MFA delete enabled
+hard-fail-on:
+  - CKV_AWS_19  # Encryption is required
+  - CKV_AWS_111  # IAM policies should not allow full administrative privileges

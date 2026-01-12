@@ -1,0 +1,55 @@
+# =============================================================================
+# Checkov Custom Policy: Ensure Encryption at Rest
+# =============================================================================
+# This policy checks that all storage resources have encryption at rest enabled.
+
+from checkov.terraform.checks.resource.base_resource_check import BaseResourceCheck
+
+class EncryptionAtRestCheck(BaseResourceCheck):
+    def __init__(self):
+        name = "Ensure encryption at rest is enabled for all storage resources"
+        id = "CKV_CUSTOM_001"
+        supported_resources = [
+            "aws_db_instance",
+            "aws_rds_cluster",
+            "aws_dynamodb_table",
+            "aws_ebs_volume",
+            "aws_s3_bucket",
+            "aws_elasticache_cluster",
+            "aws_kinesis_stream",
+            "aws_sqs_queue"
+        ]
+        categories = ["encryption", "security"]
+        super().__init__(name=name, id=id, categories=categories, supported_resources=supported_resources)
+
+    def scan_resource_conf(self, conf):
+        """
+        Looks for encryption configuration in storage resources.
+        Returns CheckResult.PASSED if encryption is enabled.
+        Returns CheckResult.FAILED if encryption is not enabled.
+        """
+        # Check for storage_encrypted attribute (RDS, ElastiCache)
+        if "storage_encrypted" in conf:
+            if conf["storage_encrypted"] == [True]:
+                return CheckResult.PASSED
+
+        # Check for server_side_encryption_configuration (S3)
+        if "server_side_encryption_configuration" in conf:
+            return CheckResult.PASSED
+
+        # Check for encryption at rest (DynamoDB)
+        if "server_side_encryption" in conf:
+            return CheckResult.PASSED
+
+        # Check for encrypted (EBS, Kinesis)
+        if "encrypted" in conf:
+            if conf["encrypted"] == [True]:
+                return CheckResult.PASSED
+
+        # Check for kms_master_key_id (SQS)
+        if "kms_master_key_id" in conf:
+            return CheckResult.PASSED
+
+        return CheckResult.FAILED
+
+check = EncryptionAtRestCheck()

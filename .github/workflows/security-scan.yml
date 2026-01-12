@@ -1,0 +1,88 @@
+# =============================================================================
+# GitHub Actions Workflow: Security Scanning
+# =============================================================================
+# Runs security scans on infrastructure code including:
+# - Checkov for IaC security scanning
+# - tfsec for Terraform-specific security checks
+# - Trivy for vulnerability scanning
+
+name: Security Scanning
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '22-iac-platform/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '22-iac-platform/**'
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Checkov IaC Security Scan
+  # ---------------------------------------------------------------------------
+  checkov:
+    name: Checkov Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: 22-iac-platform
+          framework: terraform
+          output_format: cli,sarif
+          output_file_path: results/,results/checkov.sarif
+          soft_fail: false
+          download_external_modules: true
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results/checkov.sarif
+
+  # ---------------------------------------------------------------------------
+  # tfsec Security Scan
+  # ---------------------------------------------------------------------------
+  tfsec:
+    name: tfsec Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          soft_fail: false
+          working_directory: 22-iac-platform
+
+  # ---------------------------------------------------------------------------
+  # Trivy Vulnerability Scan
+  # ---------------------------------------------------------------------------
+  trivy:
+    name: Trivy IaC Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '22-iac-platform'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'

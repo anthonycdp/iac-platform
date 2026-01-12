@@ -1,0 +1,88 @@
+# =============================================================================
+# Sentinel Policy: Restrict EC2 Instance Types
+# =============================================================================
+# This policy restricts EC2 instances to approved types based on
+# the environment. This helps control costs and ensures consistency.
+
+import "tfplan/v2" as tfplan
+
+# Approved instance types by environment
+approved_types_dev = [
+    "t3.nano",
+    "t3.micro",
+    "t3.small",
+    "t2.nano",
+    "t2.micro",
+    "t2.small",
+]
+
+approved_types_staging = [
+    "t3.small",
+    "t3.medium",
+    "t2.small",
+    "t2.medium",
+]
+
+approved_types_prod = [
+    "t3.medium",
+    "t3.large",
+    "t3.xlarge",
+    "m5.large",
+    "m5.xlarge",
+    "m6i.large",
+    "m6i.xlarge",
+    "c5.large",
+    "c5.xlarge",
+    "r5.large",
+    "r5.xlarge",
+    "r6g.large",
+]
+
+# Get the environment from the Terraform variables
+environment = tfplan.variables.environment else "dev"
+
+# Select the appropriate approved types list based on environment
+approved_types = func() {
+    if environment == "prod" {
+        approved_types_prod
+    } else {
+        if environment == "staging" {
+            approved_types_staging
+        } else {
+            approved_types_dev
+        }
+    }
+}
+
+# Get all EC2 instance resources
+ec2_instances = filter tfplan.resource_changes as _, rc {
+    rc.type is "aws_instance" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+# Get all launch template resources
+launch_templates = filter tfplan.resource_changes as _, rc {
+    rc.type is "aws_launch_template" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+# Check EC2 instances
+ec2_compliant = rule {
+    all ec2_instances as _, rc {
+        rc.change.after.instance_type in approved_types()
+    }
+}
+
+# Check launch templates
+lt_compliant = rule {
+    all launch_templates as _, rc {
+        rc.change.after.instance_type in approved_types()
+    }
+}
+
+# Main rule
+main = rule {
+    ec2_compliant and lt_compliant
+}

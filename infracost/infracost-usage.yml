@@ -1,0 +1,67 @@
+# =============================================================================
+# Infracost Usage Data
+# =============================================================================
+# Usage-based cost estimates for resources that don't have a fixed monthly price.
+# Adjust these values based on your actual or expected usage.
+
+version: 0.1
+resource_usage:
+  # NAT Gateway usage (per environment)
+  module.networking.aws_nat_gateway.main:
+    monthly_data_processed_gb: 100  # GB per month
+
+  # ALB usage
+  module.compute.aws_lb.main:
+    monthly_data_processed_gb: 500  # GB per month
+    new_connections: 100000         # Number of new connections per month
+    active_connections: 1000        # Average active connections
+
+  # RDS usage
+  module.database.aws_db_instance.main:
+    monthly_cpu_credit_hrs: 0       # T3 instance CPU credits (0 for unlimited)
+    additional_backup_storage_gb: 10 # Additional backup storage
+
+  # S3 buckets
+  module.storage.aws_s3_bucket.data:
+    monthly_object_storage_gb: 100   # Storage in GB
+    monthly_object_requests: 1000000 # Number of requests
+
+  # CloudWatch Logs
+  module.monitoring.aws_cloudwatch_log_group.main:
+    monthly_ingested_data_gb: 10     # Log data ingested per month
+    monthly_storage_gb: 30           # Log data stored
+
+  # EC2 instances (for detailed cost breakdown)
+  module.compute.aws_launch_template.main:
+    # These values are estimates for usage-based calculations
+    monthly_cpu_credit_hrs: 0
+
+  # EBS volumes
+  module.compute.aws_launch_template.main.ebs:
+    monthly_snapshot_storage_gb: 50  # Snapshot storage
+
+# Environment-specific overrides
+resource_usage_overrides:
+  environments/dev:
+    module.networking.aws_nat_gateway.main:
+      monthly_data_processed_gb: 50
+    module.compute.aws_lb.main:
+      monthly_data_processed_gb: 200
+    module.database.aws_db_instance.main:
+      additional_backup_storage_gb: 5
+
+  environments/staging:
+    module.networking.aws_nat_gateway.main:
+      monthly_data_processed_gb: 100
+    module.compute.aws_lb.main:
+      monthly_data_processed_gb: 500
+    module.database.aws_db_instance.main:
+      additional_backup_storage_gb: 10
+
+  environments/prod:
+    module.networking.aws_nat_gateway.main:
+      monthly_data_processed_gb: 500
+    module.compute.aws_lb.main:
+      monthly_data_processed_gb: 2000
+    module.database.aws_db_instance.main:
+      additional_backup_storage_gb: 50

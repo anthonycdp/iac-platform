@@ -1,0 +1,49 @@
+# =============================================================================
+# Sentinel Policy: Prohibit Public S3 Buckets
+# =============================================================================
+# This policy prevents the creation of publicly accessible S3 buckets.
+# Public buckets are a common security vulnerability.
+
+import "tfplan/v2" as tfplan
+
+# Get all S3 bucket public access block resources
+public_access_blocks = filter tfplan.resource_changes as _, rc {
+    rc.type is "aws_s3_bucket_public_access_block" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+# Rule: All public access blocks must block public access
+all_public_blocked = rule {
+    all public_access_blocks as _, rc {
+        rc.change.after.block_public_acls is true and
+        rc.change.after.block_public_policy is true and
+        rc.change.after.ignore_public_acls is true and
+        rc.change.after.restrict_public_buckets is true
+    }
+}
+
+# Check for bucket ACLs that grant public access
+bucket_acls = filter tfplan.resource_changes as _, rc {
+    rc.type is "aws_s3_bucket_acl" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+no_public_acls = rule {
+    all bucket_acls as _, rc {
+        rc.change.after.acl not in ["public-read", "public-read-write", "authenticated-read"]
+    }
+}
+
+# Check for bucket policies that allow public access
+bucket_policies = filter tfplan.resource_changes as _, rc {
+    rc.type is "aws_s3_bucket_policy" and
+    rc.mode is "managed" and
+    rc.change.actions does not contain "delete"
+}
+
+# Main rule
+main = rule {
+    all_public_blocked and no_public_acls
+}
