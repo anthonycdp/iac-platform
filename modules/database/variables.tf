@@ -126,9 +126,9 @@ variable "parameters" {
   description = "Map of custom DB parameters"
   type        = map(string)
   default = {
-    "log_connections"     = "1"
-    "log_disconnections"  = "1"
-    "log_duration"        = "1"
+    "log_connections"            = "1"
+    "log_disconnections"         = "1"
+    "log_duration"               = "1"
     "log_min_duration_statement" = "100"
   }
 }

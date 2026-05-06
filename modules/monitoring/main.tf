@@ -15,7 +15,8 @@ locals {
 }
 
 resource "aws_sns_topic" "alerts" {
-  name = "${var.name_prefix}-alerts"
+  name              = "${var.name_prefix}-alerts"
+  kms_master_key_id = var.kms_key_id
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-alerts"
@@ -30,9 +31,9 @@ resource "aws_sns_topic_subscription" "email" {
 }
 
 resource "aws_cloudwatch_log_group" "application" {
-  count               = var.existing_log_group_name == "" ? 1 : 0
-  name                = "/aws/${var.name_prefix}/application"
-  retention_in_days   = var.log_retention_days
+  count             = var.existing_log_group_name == "" ? 1 : 0
+  name              = "/aws/${var.name_prefix}/application"
+  retention_in_days = var.log_retention_days
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-application-logs"
@@ -124,11 +125,11 @@ resource "aws_cloudwatch_dashboard" "main" {
         width  = local.dashboard_width_full
         height = local.dashboard_height
         properties = {
-          title          = "Recent Application Errors"
-          logGroupNames  = [var.existing_log_group_name != "" ? var.existing_log_group_name : aws_cloudwatch_log_group.application[0].name]
-          view           = "table"
-          query          = "fields @timestamp, @message\n| filter @message like /ERROR/\n| sort @timestamp desc\n| limit 100"
-          region         = var.region
+          title         = "Recent Application Errors"
+          logGroupNames = [var.existing_log_group_name != "" ? var.existing_log_group_name : aws_cloudwatch_log_group.application[0].name]
+          view          = "table"
+          query         = "fields @timestamp, @message\n| filter @message like /ERROR/\n| sort @timestamp desc\n| limit 100"
+          region        = var.region
         }
       }
     ]
@@ -205,7 +206,7 @@ resource "aws_cloudwatch_metric_alarm" "estimated_charges" {
   period              = local.billing_period_seconds
   statistic           = "Maximum"
   threshold           = var.billing_threshold
-  alarm_description   = "AWS charges exceed \$${var.billing_threshold}"
+  alarm_description   = "AWS charges exceed USD ${var.billing_threshold}"
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]
 
@@ -264,7 +265,7 @@ resource "aws_iam_role_policy_attachment" "config" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWS_ConfigRole"
 }
 
-resource "aws_config_rule" "encrypted_volumes" {
+resource "aws_config_config_rule" "encrypted_volumes" {
   name        = "${var.name_prefix}-encrypted-volumes"
   description = "EBS volumes must be encrypted"
 
@@ -276,7 +277,7 @@ resource "aws_config_rule" "encrypted_volumes" {
   depends_on = [aws_config_configuration_recorder.main]
 }
 
-resource "aws_config_rule" "s3_bucket_public_read" {
+resource "aws_config_config_rule" "s3_bucket_public_read" {
   name        = "${var.name_prefix}-s3-public-read"
   description = "S3 buckets must not be publicly readable"
 
@@ -288,7 +289,7 @@ resource "aws_config_rule" "s3_bucket_public_read" {
   depends_on = [aws_config_configuration_recorder.main]
 }
 
-resource "aws_config_rule" "s3_bucket_ssl" {
+resource "aws_config_config_rule" "s3_bucket_ssl" {
   name        = "${var.name_prefix}-s3-ssl"
   description = "S3 buckets must require SSL"
 

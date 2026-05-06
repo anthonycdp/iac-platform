@@ -40,7 +40,7 @@ variable "security_group_id" {
 variable "ami_id" {
   description = "AMI ID for EC2 instances"
   type        = string
-  default     = ""  # Will use latest Amazon Linux 2 if not specified
+  default     = "" # Will use latest Amazon Linux 2 if not specified
 }
 
 variable "instance_type" {

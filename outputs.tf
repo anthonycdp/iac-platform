@@ -103,8 +103,8 @@ output "s3_bucket_names" {
 output "security_group_ids" {
   description = "IDs of created security groups"
   value = {
-    alb     = module.security.alb_security_group_id
-    compute = module.security.compute_security_group_id
+    alb      = module.security.alb_security_group_id
+    compute  = module.security.compute_security_group_id
     database = module.security.database_security_group_id
   }
 }

@@ -93,11 +93,11 @@ resource "aws_db_instance" "main" {
   backup_window           = var.backup_window
   maintenance_window      = var.maintenance_window
 
-  deletion_protection        = var.environment == "prod"
-  skip_final_snapshot        = var.environment != "prod"
-  final_snapshot_identifier  = var.environment == "prod" ? "${var.name_prefix}-final-snapshot" : null
-  publicly_accessible        = false
-  copy_tags_to_snapshot      = true
+  deletion_protection       = var.environment == "prod"
+  skip_final_snapshot       = var.environment != "prod"
+  final_snapshot_identifier = var.environment == "prod" ? "${var.name_prefix}-final-snapshot" : null
+  publicly_accessible       = false
+  copy_tags_to_snapshot     = true
 
   performance_insights_enabled          = var.performance_insights_enabled
   performance_insights_retention_period = var.performance_insights_enabled ? local.performance_insights_retention : null
@@ -202,11 +202,11 @@ resource "aws_cloudwatch_metric_alarm" "connections_high" {
 resource "aws_db_instance" "read_replica" {
   count = var.create_read_replica ? 1 : 0
 
-  identifier               = "${var.name_prefix}-db-replica"
-  replicate_source_db      = aws_db_instance.main.identifier
-  instance_class           = var.instance_class
-  vpc_security_group_ids   = [var.security_group_id]
-  publicly_accessible      = false
+  identifier                   = "${var.name_prefix}-db-replica"
+  replicate_source_db          = aws_db_instance.main.identifier
+  instance_class               = var.instance_class
+  vpc_security_group_ids       = [var.security_group_id]
+  publicly_accessible          = false
   performance_insights_enabled = var.performance_insights_enabled
 
   tags = merge(var.tags, {

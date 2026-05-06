@@ -18,6 +18,12 @@ variable "alert_email" {
   default     = ""
 }
 
+variable "kms_key_id" {
+  description = "KMS key ID or ARN for encrypting alert topics"
+  type        = string
+  default     = null
+}
+
 variable "log_retention_days" {
   description = "Number of days to retain CloudWatch logs"
   type        = number
@@ -51,12 +57,6 @@ variable "billing_threshold" {
   description = "Billing threshold in USD"
   type        = number
   default     = 100
-}
-
-variable "enable_billing_alerts" {
-  description = "Enable billing alerts"
-  type        = bool
-  default     = true
 }
 
 variable "config_bucket_name" {

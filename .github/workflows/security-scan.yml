@@ -11,15 +11,16 @@ name: Security Scanning
 on:
   push:
     branches: [main]
-    paths:
-      - '22-iac-platform/**'
   pull_request:
     branches: [main]
-    paths:
-      - '22-iac-platform/**'
   schedule:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -36,16 +37,17 @@ jobs:
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: 22-iac-platform
+          directory: .
+          config_file: policies/checkov/.checkov.yaml
           framework: terraform
           output_format: cli,sarif
-          output_file_path: results/,results/checkov.sarif
+          output_file_path: console,results/checkov.sarif
           soft_fail: false
           download_external_modules: true
 
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: ${{ always() && hashFiles('results/checkov.sarif') != '' }}
         with:
           sarif_file: results/checkov.sarif
 
@@ -63,8 +65,8 @@ jobs:
       - name: Run tfsec
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          soft_fail: false
-          working_directory: 22-iac-platform
+          working_directory: .
+          additional_args: --tfvars-file example.tfvars
 
   # ---------------------------------------------------------------------------
   # Trivy Vulnerability Scan
@@ -81,8 +83,10 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'config'
-          scan-ref: '22-iac-platform'
+          scan-ref: '.'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
+          tf-vars: 'example.tfvars'
+          ignore-policy: 'policies/trivy/ignore.rego'

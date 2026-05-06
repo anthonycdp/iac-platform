@@ -21,9 +21,9 @@ output "rds_endpoint" {
 output "environment_info" {
   description = "Environment information"
   value = {
-    name        = var.environment
-    region      = var.aws_region
-    project     = var.project_name
-    created_at  = timestamp()
+    name       = var.environment
+    region     = var.aws_region
+    project    = var.project_name
+    created_at = timestamp()
   }
 }

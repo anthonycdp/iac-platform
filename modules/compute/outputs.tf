@@ -34,7 +34,7 @@ output "http_target_group_arn" {
 
 output "https_target_group_arn" {
   description = "ARN of the HTTPS target group"
-  value       = var.acm_certificate_arn != null ? aws_lb_target_group.https[0].arn : null
+  value       = var.acm_certificate_arn != null ? aws_lb_target_group.https.arn : null
 }
 
 output "http_listener_arn" {

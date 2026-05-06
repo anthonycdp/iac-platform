@@ -113,10 +113,27 @@ resource "aws_security_group" "alb" {
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP traffic to VPC targets"
+    from_port   = local.http_port
+    to_port     = local.http_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "HTTPS traffic to VPC targets"
+    from_port   = local.https_port
+    to_port     = local.https_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "Application traffic to VPC targets"
+    from_port   = var.application_port
+    to_port     = var.application_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = merge(var.tags, {
@@ -162,10 +179,35 @@ resource "aws_security_group" "compute" {
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    description = "Application traffic within VPC"
+    from_port   = var.application_port
+    to_port     = var.application_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "Database traffic within VPC"
+    from_port   = var.database_port
+    to_port     = var.database_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "HTTPS traffic within VPC"
+    from_port   = local.https_port
+    to_port     = local.https_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "HTTP traffic within VPC"
+    from_port   = local.http_port
+    to_port     = local.http_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = merge(var.tags, {
@@ -277,7 +319,7 @@ resource "aws_wafv2_web_acl" "main" {
 }
 
 resource "aws_wafv2_web_acl_logging_configuration" "main" {
-  count                  = var.enable_waf ? 1 : 0
+  count                   = var.enable_waf ? 1 : 0
   log_destination_configs = [var.waf_log_destination_arn]
   resource_arn            = aws_wafv2_web_acl.main[0].arn
 
@@ -298,12 +340,12 @@ resource "aws_wafv2_web_acl_logging_configuration" "main" {
 }
 
 resource "aws_budgets_budget" "monthly" {
-  count         = var.enable_budgets ? 1 : 0
-  name          = "${var.name_prefix}-monthly-budget"
-  budget_type   = "COST"
-  limit_amount  = var.monthly_budget_amount
-  limit_unit    = "USD"
-  time_unit     = "MONTHLY"
+  count        = var.enable_budgets ? 1 : 0
+  name         = "${var.name_prefix}-monthly-budget"
+  budget_type  = "COST"
+  limit_amount = var.monthly_budget_amount
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
 
   notification {
     comparison_operator        = "GREATER_THAN"

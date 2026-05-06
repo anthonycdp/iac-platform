@@ -61,6 +61,27 @@ variable "tags" {
 }
 
 # -----------------------------------------------------------------------------
+# KMS Key for State Encryption
+# -----------------------------------------------------------------------------
+
+resource "aws_kms_key" "terraform_state" {
+  description             = "KMS key for Terraform state encryption"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = var.tags
+}
+
+resource "aws_kms_alias" "terraform_state" {
+  name          = "alias/${replace(var.state_bucket_name, ".", "-")}"
+  target_key_id = aws_kms_key.terraform_state.key_id
+}
+
+# -----------------------------------------------------------------------------
 # S3 Bucket for State Storage
 # -----------------------------------------------------------------------------
 
@@ -68,10 +89,22 @@ resource "aws_s3_bucket" "terraform_state" {
   bucket = var.state_bucket_name
 
   lifecycle {
-    prevent_destroy = true  # Prevent accidental deletion
+    prevent_destroy = true # Prevent accidental deletion
   }
 
   tags = var.tags
+}
+
+resource "aws_s3_bucket" "terraform_state_logs" {
+  bucket = "${var.state_bucket_name}-access-logs"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.state_bucket_name}-access-logs"
+  })
 }
 
 resource "aws_s3_bucket_versioning" "terraform_state" {
@@ -82,8 +115,28 @@ resource "aws_s3_bucket_versioning" "terraform_state" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "terraform_state_logs" {
+  bucket = aws_s3_bucket.terraform_state_logs.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
   bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.terraform_state.arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state_logs" {
+  bucket = aws_s3_bucket.terraform_state_logs.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -101,12 +154,23 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_public_access_block" "terraform_state_logs" {
+  bucket = aws_s3_bucket.terraform_state_logs.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
   bucket = aws_s3_bucket.terraform_state.id
 
   rule {
     id     = "archive-old-versions"
     status = "Enabled"
+
+    filter {}
 
     noncurrent_version_transition {
       noncurrent_days = 90
@@ -117,6 +181,32 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
       noncurrent_days = 365
     }
   }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "terraform_state_logs" {
+  bucket = aws_s3_bucket.terraform_state_logs.id
+
+  rule {
+    id     = "delete-old-access-logs"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = 365
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+  }
+}
+
+resource "aws_s3_bucket_logging" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  target_bucket = aws_s3_bucket.terraform_state_logs.id
+  target_prefix = "terraform-state/"
 }
 
 # -----------------------------------------------------------------------------
@@ -164,9 +254,19 @@ output "lock_table_arn" {
   value       = aws_dynamodb_table.terraform_locks.arn
 }
 
+output "state_kms_key_arn" {
+  description = "ARN of the KMS key used for state encryption"
+  value       = aws_kms_key.terraform_state.arn
+}
+
+output "state_logs_bucket_name" {
+  description = "Name of the S3 bucket for Terraform state access logs"
+  value       = aws_s3_bucket.terraform_state_logs.id
+}
+
 output "backend_config_example" {
   description = "Example backend configuration to use in environments"
-  value = <<-EOT
+  value       = <<-EOT
     terraform {
       backend "s3" {
         bucket         = "${aws_s3_bucket.terraform_state.id}"

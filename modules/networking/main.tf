@@ -3,7 +3,7 @@
 # =============================================================================
 
 locals {
-  nat_gateway_count = var.enable_nat_gateway ? (var.single_nat_gateway ? 1 : length(var.public_subnet_cidrs)) : 0
+  nat_gateway_count         = var.enable_nat_gateway ? (var.single_nat_gateway ? 1 : length(var.public_subnet_cidrs)) : 0
   private_route_table_count = var.enable_nat_gateway ? (var.single_nat_gateway ? 1 : length(var.private_subnet_cidrs)) : 1
 }
 
@@ -31,7 +31,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.public_subnet_cidrs[count.index]
   availability_zone       = var.availability_zones[count.index]
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-public-${var.availability_zones[count.index]}"
@@ -152,10 +152,10 @@ resource "aws_flow_log" "main" {
 }
 
 resource "aws_cloudwatch_log_group" "flow_logs" {
-  count               = var.enable_flow_logs ? 1 : 0
-  name                = "/aws/vpc-flow-logs/${var.name_prefix}"
-  retention_in_days   = var.flow_logs_retention_days
-  tags                = var.tags
+  count             = var.enable_flow_logs ? 1 : 0
+  name              = "/aws/vpc-flow-logs/${var.name_prefix}"
+  retention_in_days = var.flow_logs_retention_days
+  tags              = var.tags
 }
 
 resource "aws_iam_role" "flow_logs" {

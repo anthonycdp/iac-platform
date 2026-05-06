@@ -19,7 +19,7 @@ output "log_group_name" {
 
 output "log_group_arn" {
   description = "ARN of the application CloudWatch log group"
-  value       = aws_cloudwatch_log_group.application.arn
+  value       = var.existing_log_group_name != "" ? null : aws_cloudwatch_log_group.application[0].arn
 }
 
 output "system_log_group_name" {

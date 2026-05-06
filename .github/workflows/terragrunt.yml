@@ -41,7 +41,7 @@ on:
 
 env:
   TG_VERSION: '0.55.0'
-  TF_VERSION: '1.6.0'
+  TF_VERSION: '1.15.2'
 
 permissions:
   id-token: write

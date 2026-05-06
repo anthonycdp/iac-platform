@@ -58,6 +58,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
     id     = "transition-to-ia"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = var.ia_transition_days
       storage_class = "STANDARD_IA"
@@ -86,6 +88,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
   rule {
     id     = "abort-incomplete-multipart"
     status = "Enabled"
+
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -147,6 +151,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     id     = "delete-old-logs"
     status = "Enabled"
 
+    filter {}
+
     expiration {
       days = var.logs_retention_days
     }
@@ -174,7 +180,7 @@ resource "aws_s3_bucket_versioning" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
 
   versioning_configuration {
-    status = "Disabled"
+    status = "Enabled"
   }
 }
 
@@ -238,10 +244,19 @@ resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
     id     = "delete-old-alb-logs"
     status = "Enabled"
 
+    filter {}
+
     expiration {
       days = var.logs_retention_days
     }
   }
+}
+
+resource "aws_s3_bucket_logging" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "alb-log-bucket-logs/"
 }
 
 # -----------------------------------------------------------------------------
@@ -249,8 +264,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
 # -----------------------------------------------------------------------------
 
 resource "aws_s3_bucket" "backup" {
-  bucket        = "${var.name_prefix}-backup"
-  force_destroy = var.environment != "prod"
+  bucket              = "${var.name_prefix}-backup"
+  force_destroy       = var.environment != "prod"
+  object_lock_enabled = true
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-backup"
@@ -289,9 +305,7 @@ resource "aws_s3_bucket_public_access_block" "backup" {
 resource "aws_s3_bucket_object_lock_configuration" "backup" {
   bucket = aws_s3_bucket.backup.id
 
-  object_lock_configuration {
-    object_lock_enabled = "Enabled"
-  }
+  object_lock_enabled = "Enabled"
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "backup" {
@@ -300,6 +314,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
   rule {
     id     = "backup-retention"
     status = "Enabled"
+
+    filter {}
 
     expiration {
       days                         = var.backup_retention_days
@@ -310,4 +326,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "backup" {
       noncurrent_days = var.backup_retention_days
     }
   }
+}
+
+resource "aws_s3_bucket_logging" "backup" {
+  bucket = aws_s3_bucket.backup.id
+
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "backup-bucket-logs/"
 }

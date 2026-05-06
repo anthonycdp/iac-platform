@@ -20,6 +20,7 @@ resource "aws_lb" "main" {
   subnets            = var.public_subnet_ids
 
   enable_deletion_protection = var.environment == "prod" ? true : false
+  drop_invalid_header_fields = true
 
   access_logs {
     bucket  = var.logs_bucket_name
@@ -76,8 +77,6 @@ resource "aws_lb_target_group" "https" {
   }
 
   tags = var.tags
-
-  depends_on = [aws_lb_listener.https]
 }
 
 # -----------------------------------------------------------------------------
