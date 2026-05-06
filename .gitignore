@@ -63,3 +63,7 @@ coverage/
 # Backup files
 *.bak
 *.backup
+
+#AI Tools
+CLAUDE.md
+AGENTS.md
